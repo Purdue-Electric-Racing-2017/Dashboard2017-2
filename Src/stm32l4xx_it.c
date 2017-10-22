@@ -78,23 +78,24 @@ void SysTick_Handler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+	BaseType_t xHigherPriorityTaskWoken;
+
 	if (EXTI->PR1 & EXTI_PR1_PIF8_Msk)
 	{
 		if (xTaskGetTickCount() - BTN1_LastPressedTime > 500)
 		{
-		HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
-		CanTxMsgTypeDef msg;
-		msg.IDE = CAN_ID_STD;
-		msg.RTR = CAN_RTR_DATA;
-		msg.DLC = 1;
+			HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+			CanTxMsgTypeDef msg;
+			msg.IDE = CAN_ID_STD;
+			msg.RTR = CAN_RTR_DATA;
+			msg.DLC = 1;
 
-		msg.StdId = 0x350;
+			msg.StdId = 0x350;
 
-		msg.Data[0] = 0x01;
+			msg.Data[0] = 0x01;
 
-		xQueueSendToBackFromISR(q_txcan, &msg, 1000);
-		BTN1_LastPressedTime = xTaskGetTickCount();
-
+			xQueueSendToBackFromISR(q_txcan, &msg, &xHigherPriorityTaskWoken);
+			BTN1_LastPressedTime = xTaskGetTickCount();
 		}
 
 	}
