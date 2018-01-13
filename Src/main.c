@@ -62,6 +62,7 @@ osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 QueueHandle_t q_txcan;
+QueueHandle_t q_rxcan;
 SemaphoreHandle_t m_CAN;
 /* USER CODE END PV */
 
@@ -85,6 +86,45 @@ void taskTest()
 	}
 }
 
+void CANFilterConfig()
+{
+
+
+	  CAN_FilterConfTypeDef FilterConf;
+	  FilterConf.FilterIdHigh = 	0x205 << 5; // 2
+	  FilterConf.FilterIdLow = 		0x200 << 5; // 0
+	  FilterConf.FilterMaskIdHigh = 0x206 << 5; //3
+	  FilterConf.FilterMaskIdLow = 	0x207 << 5;	//1
+	  FilterConf.FilterFIFOAssignment = CAN_FilterFIFO0;
+	  FilterConf.FilterNumber = 0;
+	  FilterConf.FilterMode = CAN_FILTERMODE_IDLIST;
+	  FilterConf.FilterScale = CAN_FILTERSCALE_16BIT;
+	  FilterConf.FilterActivation = ENABLE;
+	  HAL_CAN_ConfigFilter(&hcan1, &FilterConf);
+
+
+}
+
+void taskBlink(void* can)
+{
+	//vTaskDelay(5000); //TESTING1
+	while (1)
+	{
+		CanTxMsgTypeDef tx;
+		tx.IDE = CAN_ID_STD;
+		tx.RTR = CAN_RTR_DATA;
+		tx.StdId = 0x600;
+		tx.DLC = 1;
+		tx.Data[0] = 1;
+
+		hcan1.pTxMsg = &tx;
+		HAL_CAN_Transmit_IT(&hcan1);						//transmit staged message
+
+		//xQueueSendToBack(rtos_can1.queue_tx, &tx, 100);
+		vTaskDelay(500);
+	}
+}
+
 void taskTXCAN()
 {
 	for (;;)
@@ -100,11 +140,11 @@ void taskTXCAN()
 				//if (state != HAL_CAN_STATE_ERROR)
 				{
 					xQueueReceive(q_txcan, &tx, portMAX_DELAY);  //actually take item out of queue
-					if (HAL_CAN_GetState(&hcan1) == HAL_CAN_STATE_READY)
+					//if (HAL_CAN_GetState(&hcan1) == HAL_CAN_STATE_READY)
 
 					{
-					hcan1.pTxMsg = &tx;
-					HAL_CAN_Transmit_IT(&hcan1);
+						hcan1.pTxMsg = &tx;
+						HAL_CAN_Transmit_IT(&hcan1);
 					}
 
 				}
@@ -115,6 +155,54 @@ void taskTXCAN()
 	}
 }
 
+void taskRXCAN()
+{
+	//CanRxMsgTypeDef rx;
+	//car.phcan->pRxMsg = &rx;
+	for (;;)
+	{
+
+		//check if CAN mutex is available
+		//if (xSemaphoreTake(car.m_CAN, 10) == pdTRUE )
+
+			HAL_CAN_Receive_IT(&hcan1, 0);
+			HAL_CAN_Receive_IT(&hcan1, 1);
+		//	xSemaphoreGive(car.m_CAN);  //release CAN mutex
+
+		vTaskSuspend(NULL);
+	}
+}
+
+void taskRXCANProcess()
+{
+	CanRxMsgTypeDef rx;  //CanRxMsgTypeDef to be received on the queue
+	while (1)
+	{
+
+		//if there is a CanRxMsgTypeDef in the queue, pop it, and store in rx
+		if (xQueueReceive(q_rxcan, &rx, portMAX_DELAY) == pdTRUE)
+		{
+			//A CAN message has been recieved
+
+			//check what kind of message we received
+			switch (rx.StdId)
+			{
+				case 0x200:  //if pedalbox1 message
+				{
+					if (rx.Data[0] == 1) //car is in ready to drive
+					{
+						HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+					}
+					else if (rx.Data[0] == 0) //car is not ready to drive
+					{
+						HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+					}
+					break;
+				}
+			}
+		}
+	}
+}
 /* USER CODE END 0 */
 
 int main(void)
@@ -145,9 +233,18 @@ int main(void)
   MX_CAN1_Init();
 
   /* USER CODE BEGIN 2 */
-  xTaskCreate(taskTXCAN, "TX CAN", 256, NULL, 1, NULL);
+  CANFilterConfig();
   m_CAN =			xSemaphoreCreateMutex();
   q_txcan = 		xQueueCreate(3, sizeof(CanTxMsgTypeDef));
+  q_rxcan = 		xQueueCreate(3, sizeof(CanRxMsgTypeDef));
+  xTaskCreate(taskTXCAN, "TX CAN", 64, NULL, 1, NULL);
+  xTaskCreate(taskRXCAN, "RX CAN", 32, NULL, 1, NULL);
+  xTaskCreate(taskRXCANProcess, "TX CAN Process", 64, NULL, 1, NULL);
+  xTaskCreate(taskBlink, "Blink CAN", 32, NULL, 1, NULL);
+
+	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+
 
 
 
@@ -285,7 +382,6 @@ static void MX_CAN1_Init(void)
         * Output
         * EVENT_OUT
         * EXTI
-     PA2   ------> USART2_TX
      PA15 (JTDI)   ------> USART2_RX
 */
 static void MX_GPIO_Init(void)
@@ -299,15 +395,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, LED1_Pin|LED2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : VCP_TX_Pin */
-  GPIO_InitStruct.Pin = VCP_TX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  /*Configure GPIO pins : LED1_Pin LED2_Pin */
+  GPIO_InitStruct.Pin = LED1_Pin|LED2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-  HAL_GPIO_Init(VCP_TX_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BTN1_Pin */
   GPIO_InitStruct.Pin = BTN1_Pin;

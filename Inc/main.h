@@ -58,8 +58,10 @@
 
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOA
-#define VCP_TX_Pin GPIO_PIN_2
-#define VCP_TX_GPIO_Port GPIOA
+#define LED1_Pin GPIO_PIN_1
+#define LED1_GPIO_Port GPIOA
+#define LED2_Pin GPIO_PIN_2
+#define LED2_GPIO_Port GPIOA
 #define BTN1_Pin GPIO_PIN_8
 #define BTN1_GPIO_Port GPIOA
 #define BTN1_EXTI_IRQn EXTI9_5_IRQn

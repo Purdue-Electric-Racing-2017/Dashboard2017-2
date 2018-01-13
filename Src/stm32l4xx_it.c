@@ -39,11 +39,14 @@
 /* USER CODE BEGIN 0 */
 #include "main.h"
 extern QueueHandle_t q_txcan;
+extern QueueHandle_t q_rxcan;
 TickType_t BTN1_LastPressedTime;
+
 
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern CAN_HandleTypeDef hcan1;
 
 extern TIM_HandleTypeDef htim1;
 
@@ -71,6 +74,74 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32l4xx.s).                    */
 /******************************************************************************/
+
+/**
+* @brief This function handles CAN1 TX interrupt.
+*/
+void CAN1_TX_IRQHandler(void)
+{
+  /* USER CODE BEGIN CAN1_TX_IRQn 0 */
+
+  /* USER CODE END CAN1_TX_IRQn 0 */
+  HAL_CAN_IRQHandler(&hcan1);
+  /* USER CODE BEGIN CAN1_TX_IRQn 1 */
+
+  /* USER CODE END CAN1_TX_IRQn 1 */
+}
+
+/**
+* @brief This function handles CAN1 RX0 interrupt.
+*/
+void CAN1_RX0_IRQHandler(void)
+{
+  /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
+
+  /* USER CODE END CAN1_RX0_IRQn 0 */
+  HAL_CAN_IRQHandler(&hcan1);
+  /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
+  if (hcan1.pRxMsg->StdId == 0x200)
+  {
+	  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+
+  }
+	//xQueueSendFromISR(q_rxcan, (hcan1.pRxMsg), NULL);  //send to the rx can process task
+
+//	//check what kind of message we received
+//	switch (hcan1.pRxMsg->StdId)
+//	{
+//		case 0x200:  //if pedalbox1 message
+//		{
+//			if (hcan1.pRxMsg->Data[0] == 1) //car is in ready to drive
+//			{
+//				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+//			}
+//			else if (hcan1.pRxMsg->Data[0] == 0) //car is not ready to drive
+//			{
+//				HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+//			}
+//			break;
+//		}
+//	}
+	HAL_CAN_Receive_IT(&hcan1, 0);  //get ready to receive again
+
+
+  /* USER CODE END CAN1_RX0_IRQn 1 */
+}
+
+/**
+* @brief This function handles CAN1 RX1 interrupt.
+*/
+void CAN1_RX1_IRQHandler(void)
+{
+  /* USER CODE BEGIN CAN1_RX1_IRQn 0 */
+
+  /* USER CODE END CAN1_RX1_IRQn 0 */
+  HAL_CAN_IRQHandler(&hcan1);
+  /* USER CODE BEGIN CAN1_RX1_IRQn 1 */
+	//xQueueSendFromISR(q_rxcan, (hcan1.pRxMsg), NULL);  //send to the rx can process task
+	HAL_CAN_Receive_IT(&hcan1, 0);  //get ready to receive again
+  /* USER CODE END CAN1_RX1_IRQn 1 */
+}
 
 /**
 * @brief This function handles EXTI line[9:5] interrupts.
