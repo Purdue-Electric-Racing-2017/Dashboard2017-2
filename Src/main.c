@@ -145,7 +145,7 @@ void taskTXCAN()
 
 					{
 						hcan1.pTxMsg = &tx;
-						HAL_CAN_Transmit(&hcan1);
+						HAL_CAN_Transmit(&hcan1,100);
 					}
 
 				}
