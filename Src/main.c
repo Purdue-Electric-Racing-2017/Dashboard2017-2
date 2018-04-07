@@ -93,11 +93,11 @@ void CANFilterConfig()
 	  CAN_FilterConfTypeDef FilterConf;
 	  FilterConf.FilterIdHigh = 	0x205 << 5; // 2
 	  FilterConf.FilterIdLow = 		0x200 << 5; // 0
-	  FilterConf.FilterMaskIdHigh = 0x206 << 5; //3
-	  FilterConf.FilterMaskIdLow = 	0x207 << 5;	//1
+	  FilterConf.FilterMaskIdHigh = 0; //3
+	  FilterConf.FilterMaskIdLow = 	0;	//1
 	  FilterConf.FilterFIFOAssignment = CAN_FilterFIFO0;
 	  FilterConf.FilterNumber = 0;
-	  FilterConf.FilterMode = CAN_FILTERMODE_IDLIST;
+	  FilterConf.FilterMode = CAN_FILTERMODE_IDMASK;
 	  FilterConf.FilterScale = CAN_FILTERSCALE_16BIT;
 	  FilterConf.FilterActivation = ENABLE;
 	  HAL_CAN_ConfigFilter(&hcan1, &FilterConf);
@@ -117,19 +117,20 @@ void taskBlink(void* can)
 		tx.DLC = 1;
 		tx.Data[0] = 1;
 
-		hcan1.pTxMsg = &tx;
-		HAL_CAN_Transmit_IT(&hcan1);						//transmit staged message
+		//hcan1.pTxMsg = &tx;
+		//HAL_CAN_Transmit_IT(&hcan1);						//transmit staged message
 
-		//xQueueSendToBack(rtos_can1.queue_tx, &tx, 100);
+		xQueueSendToBack(q_txcan, &tx, 100);
 		vTaskDelay(500);
 	}
 }
 
 void taskTXCAN()
 {
+	CanTxMsgTypeDef tx;
+
 	for (;;)
 	{
-		CanTxMsgTypeDef tx;
 		//check if this task is triggered
 		if (xQueuePeek(q_txcan, &tx, portMAX_DELAY) == pdTRUE)
 		{
@@ -144,7 +145,7 @@ void taskTXCAN()
 
 					{
 						hcan1.pTxMsg = &tx;
-						HAL_CAN_Transmit_IT(&hcan1);
+						HAL_CAN_Transmit(&hcan1);
 					}
 
 				}
@@ -165,8 +166,6 @@ void taskRXCAN()
 		//check if CAN mutex is available
 		//if (xSemaphoreTake(car.m_CAN, 10) == pdTRUE )
 
-			HAL_CAN_Receive_IT(&hcan1, 0);
-			HAL_CAN_Receive_IT(&hcan1, 1);
 		//	xSemaphoreGive(car.m_CAN);  //release CAN mutex
 
 		vTaskSuspend(NULL);
@@ -176,6 +175,7 @@ void taskRXCAN()
 void taskRXCANProcess()
 {
 	CanRxMsgTypeDef rx;  //CanRxMsgTypeDef to be received on the queue
+	rx.IDE = CAN_ID_STD;	//test
 	while (1)
 	{
 
@@ -183,11 +183,11 @@ void taskRXCANProcess()
 		if (xQueueReceive(q_rxcan, &rx, portMAX_DELAY) == pdTRUE)
 		{
 			//A CAN message has been recieved
-
+			//rx.StdId = rx.StdId / 0x100000; test
 			//check what kind of message we received
 			switch (rx.StdId)
 			{
-				case 0x200:  //if pedalbox1 message
+				case 0x200:  //if car status message
 				{
 					if (rx.Data[0] == 1) //car is in ready to drive
 					{
@@ -237,14 +237,19 @@ int main(void)
   m_CAN =			xSemaphoreCreateMutex();
   q_txcan = 		xQueueCreate(3, sizeof(CanTxMsgTypeDef));
   q_rxcan = 		xQueueCreate(3, sizeof(CanRxMsgTypeDef));
-  xTaskCreate(taskTXCAN, "TX CAN", 64, NULL, 1, NULL);
-  xTaskCreate(taskRXCAN, "RX CAN", 32, NULL, 1, NULL);
-  xTaskCreate(taskRXCANProcess, "TX CAN Process", 64, NULL, 1, NULL);
-  xTaskCreate(taskBlink, "Blink CAN", 32, NULL, 1, NULL);
+  xTaskCreate(taskTXCAN, "TX CAN", 128, NULL, 1, NULL);
+  //xTaskCreate(taskRXCAN, "RX CAN", 32, NULL, 1, NULL);
+  //xTaskCreate(taskRXCANProcess, "TX CAN Process", 64, NULL, 1, NULL);
+  xTaskCreate(taskBlink, "Blink CAN", 64, NULL, 1, NULL);
 
-	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+
+
+	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 
+
+	//HAL_CAN_Receive_IT(&hcan1, 0);
+	//HAL_CAN_Receive_IT(&hcan1, 1);
 
 
 

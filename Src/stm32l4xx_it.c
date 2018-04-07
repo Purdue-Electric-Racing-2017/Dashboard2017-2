@@ -101,9 +101,13 @@ void CAN1_RX0_IRQHandler(void)
   /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
   if (hcan1.pRxMsg->StdId == 0x200)
   {
-	  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+	  //HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+	  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+
 
   }
+
+
 	//xQueueSendFromISR(q_rxcan, (hcan1.pRxMsg), NULL);  //send to the rx can process task
 
 //	//check what kind of message we received
@@ -153,7 +157,7 @@ void EXTI9_5_IRQHandler(void)
 
 	if (EXTI->PR1 & EXTI_PR1_PIF8_Msk)
 	{
-		if (xTaskGetTickCount() - BTN1_LastPressedTime > 500)
+		if (xTaskGetTickCountFromISR() - BTN1_LastPressedTime > 500)
 		{
 			HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
 			CanTxMsgTypeDef msg;
@@ -166,7 +170,7 @@ void EXTI9_5_IRQHandler(void)
 			msg.Data[0] = 0x01;
 
 			xQueueSendToBackFromISR(q_txcan, &msg, &xHigherPriorityTaskWoken);
-			BTN1_LastPressedTime = xTaskGetTickCount();
+			BTN1_LastPressedTime = xTaskGetTickCountFromISR();
 		}
 
 	}
