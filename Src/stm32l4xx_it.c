@@ -4,7 +4,7 @@
   * @brief   Interrupt Service Routines.
   ******************************************************************************
   *
-  * COPYRIGHT(c) 2017 STMicroelectronics
+  * COPYRIGHT(c) 2018 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -40,7 +40,9 @@
 #include "main.h"
 extern QueueHandle_t q_txcan;
 extern QueueHandle_t q_rxcan;
-TickType_t BTN1_LastPressedTime;
+TickType_t BTN1_LastPressedTime=0;
+TickType_t BTN2_LastPressedTime=0;
+TickType_t BTN3_LastPressedTime=0;
 
 
 /* USER CODE END 0 */
@@ -76,6 +78,37 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+* @brief This function handles EXTI line0 interrupt.
+*/
+void EXTI0_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI0_IRQn 0 */
+//	BaseType_t xHigherPriorityTaskWoken;
+//
+//	if (xTaskGetTickCountFromISR() - BTN3_LastPressedTime > 500)
+//	{
+//		HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+//		CanTxMsgTypeDef msg;
+//		msg.IDE = CAN_ID_STD;
+//		msg.RTR = CAN_RTR_DATA;
+//		msg.DLC = 1;
+//
+//		msg.StdId = 0x352;
+//
+//		msg.Data[0] = 0x01;
+//
+//		xQueueSendToBackFromISR(q_txcan, &msg, &xHigherPriorityTaskWoken);
+//		BTN3_LastPressedTime = xTaskGetTickCountFromISR();
+//	}
+
+  /* USER CODE END EXTI0_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+  /* USER CODE BEGIN EXTI0_IRQn 1 */
+
+  /* USER CODE END EXTI0_IRQn 1 */
+}
+
+/**
 * @brief This function handles CAN1 TX interrupt.
 */
 void CAN1_TX_IRQHandler(void)
@@ -95,17 +128,12 @@ void CAN1_TX_IRQHandler(void)
 void CAN1_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
-
+//	CanTxMsgTypeDef rx;
+//	hcan1.pRxMsg = &rx;
   /* USER CODE END CAN1_RX0_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan1);
   /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
-  if (hcan1.pRxMsg->StdId == 0x200)
-  {
-	  //HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-	  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
-
-  }
 
 
 	//xQueueSendFromISR(q_rxcan, (hcan1.pRxMsg), NULL);  //send to the rx can process task
@@ -143,7 +171,7 @@ void CAN1_RX1_IRQHandler(void)
   HAL_CAN_IRQHandler(&hcan1);
   /* USER CODE BEGIN CAN1_RX1_IRQn 1 */
 	//xQueueSendFromISR(q_rxcan, (hcan1.pRxMsg), NULL);  //send to the rx can process task
-	HAL_CAN_Receive_IT(&hcan1, 0);  //get ready to receive again
+	HAL_CAN_Receive_IT(&hcan1, 1);  //get ready to receive again
   /* USER CODE END CAN1_RX1_IRQn 1 */
 }
 
@@ -174,8 +202,29 @@ void EXTI9_5_IRQHandler(void)
 		}
 
 	}
+	if (EXTI->PR1 & EXTI_PR1_PIF9_Msk)
+	{
+		if (xTaskGetTickCountFromISR() - BTN2_LastPressedTime > 500)
+		{
+			HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+			CanTxMsgTypeDef msg;
+			msg.IDE = CAN_ID_STD;
+			msg.RTR = CAN_RTR_DATA;
+			msg.DLC = 1;
+
+			msg.StdId = 0x351;
+
+			msg.Data[0] = 0x01;
+
+			xQueueSendToBackFromISR(q_txcan, &msg, &xHigherPriorityTaskWoken);
+			BTN2_LastPressedTime = xTaskGetTickCountFromISR();
+		}
+
+	}
+
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
 
   /* USER CODE END EXTI9_5_IRQn 1 */
@@ -193,6 +242,20 @@ void TIM1_UP_TIM16_IRQHandler(void)
   /* USER CODE BEGIN TIM1_UP_TIM16_IRQn 1 */
 
   /* USER CODE END TIM1_UP_TIM16_IRQn 1 */
+}
+
+/**
+* @brief This function handles EXTI line[15:10] interrupts.
+*/
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
